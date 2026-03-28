@@ -8,25 +8,29 @@
         :root { --pink: #ff007f; --black: #050505; }
         body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
         
-        /* 検索エリアを最上部に固定 */
+        /* 検索ヘッダー固定 */
         .header { position: sticky; top: 0; background: var(--black); z-index: 100; padding-bottom: 10px; border-bottom: 1px solid #333; }
-        #search-input { background: none; border: none; border-bottom: 2px solid var(--pink); font-size: 1.5rem; color: white; width: 100%; padding: 15px 0; outline: none; }
+        #search-input { background: none; border: none; border-bottom: 2px solid var(--pink); font-size: 1.5rem; color: white; width: 100%; padding: 15px 0; outline: none; border-radius: 0; }
         
         /* プレイヤーエリア */
         #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin: 15px 0; border: 1px solid #444; }
         #player { width: 100%; height: 100%; }
 
         /* リスト表示 */
-        .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; }
+        #lst { margin-top: 10px; }
+        .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .row:active { background: #111; }
         .title { flex-grow: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #eee; }
-        .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 5px 15px; font-size: 0.8rem; font-weight: bold; border-radius: 2px; }
+        .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 5px 15px; font-size: 0.8rem; font-weight: bold; border-radius: 2px; letter-spacing: 2px; flex-shrink: 0; }
+        
+        #status { font-size: 0.7rem; color: #666; margin-top: 5px; height: 1em; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <input type="text" id="search-input" placeholder="SEARCH..." onkeydown="if(event.key==='Enter') doSearch()">
-        <div id="status" style="font-size:0.7rem; color:#666; margin-top:5px;">READY.</div>
+        <input type="text" id="search-input" placeholder="SEARCH MUSIC..." onkeydown="if(event.key==='Enter') doSearch()">
+        <div id="status">READY.</div>
     </div>
 
     <div id="video-container">
@@ -37,14 +41,19 @@
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        // あなたのAPIキー
+        // 設定済みのAPIキー
         const API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak'; 
         let player;
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: '',
-                playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0 }
+                playerVars: { 
+                    'playsinline': 1, 
+                    'controls': 1, 
+                    'rel': 0,
+                    'origin': location.origin
+                }
             });
         }
 
@@ -54,35 +63,36 @@
             const lst = document.getElementById('lst');
             if (!q) return;
 
-            status.innerText = "CONNECTING...";
-            // YouTube Data API v3 を使用して検索
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&maxResults=20&key=${API_KEY}`;
+            status.innerText = "SEARCHING YOUTUBE MUSIC...";
+            
+            // Musicカテゴリ(10)を指定し、クエリにMusicを加えて精度を高める
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q + " Music")}&type=video&videoCategoryId=10&maxResults=25&key=${API_KEY}`;
             
             try {
                 const res = await fetch(url);
                 const data = await res.json();
                 
-                if (data.items) {
-                    status.innerText = `LST COUNT: ${data.items.length}`;
-                    // 各動画のIDを playVideo 関数に渡すように生成
-                    lst.innerHTML = data.items.map(i => `
-                        <div class="row" onclick="playVideo('${i.id.videoId}')">
-                            <div class="title">${i.snippet.title}</div>
-                            <div class="select-btn">選 曲</div>
-                        </div>
-                    `).join('');
+                if (data.error) {
+                    status.innerHTML = `<span style="color:var(--pink)">ERROR: ${data.error.message}</span>`;
+                    return;
                 }
+
+                status.innerText = `MUSIC LST: ${data.items.length}`;
+                lst.innerHTML = (data.items || []).map(i => `
+                    <div class="row" onclick="playVideo('${i.id.videoId}')">
+                        <div class="title">${i.snippet.title}</div>
+                        <div class="select-btn">選 曲</div>
+                    </div>
+                `).join('');
             } catch (e) {
-                status.innerText = "SEARCH ERROR.";
+                status.innerText = "NETWORK ERROR.";
             }
         }
 
-        // リストをタップした時に動画を読み込む
         function playVideo(id) {
             if (player && player.loadVideoById) {
                 player.loadVideoById(id);
-                // 入力欄からフォーカスを外す（キーボードを閉じる）
-                document.getElementById('search-input').blur(); 
+                document.getElementById('search-input').blur(); // キーボードを閉じる
             }
         }
     </script>
