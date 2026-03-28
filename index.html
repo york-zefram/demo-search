@@ -8,20 +8,19 @@
         :root { --pink: #ff007f; --black: #050505; }
         body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
         
-        /* 検索ヘッダー固定 */
-        .header { position: sticky; top: 0; background: var(--black); z-index: 100; padding-bottom: 10px; border-bottom: 1px solid #333; }
+        .header { position: sticky; top: 0; background: var(--black); z-index: 1000; padding-bottom: 10px; border-bottom: 1px solid #333; }
         #search-input { background: none; border: none; border-bottom: 2px solid var(--pink); font-size: 1.5rem; color: white; width: 100%; padding: 15px 0; outline: none; border-radius: 0; }
         
-        /* プレイヤーエリア */
-        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin: 15px 0; border: 1px solid #444; }
+        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin: 15px 0; border: 1px solid #444; position: relative; }
         #player { width: 100%; height: 100%; }
 
-        /* リスト表示 */
-        #lst { margin-top: 10px; }
-        .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; -webkit-tap-highlight-color: transparent; }
-        .row:active { background: #111; }
-        .title { flex-grow: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #eee; }
-        .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 5px 15px; font-size: 0.8rem; font-weight: bold; border-radius: 2px; letter-spacing: 2px; flex-shrink: 0; }
+        /* 再生エラー時の緊急ボタン */
+        #error-overlay { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 10; flex-direction: column; justify-content: center; align-items: center; text-align: center; }
+        #error-overlay a { color: var(--pink); border: 1px solid var(--pink); padding: 10px 20px; text-decoration: none; font-weight: bold; margin-top: 10px; }
+
+        .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; }
+        .title { flex-grow: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #ccc; }
+        .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 5px 15px; font-size: 0.8rem; font-weight: bold; letter-spacing: 2px; flex-shrink: 0; }
         
         #status { font-size: 0.7rem; color: #666; margin-top: 5px; height: 1em; }
     </style>
@@ -35,64 +34,64 @@
 
     <div id="video-container">
         <div id="player"></div>
+        <div id="error-overlay">
+            <div style="font-size:0.8rem; margin-bottom:10px;">埋め込み制限があります</div>
+            <a id="ext-link" href="#" target="_blank">YouTubeアプリで開く</a>
+        </div>
     </div>
 
     <div id="lst"></div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        // 設定済みのAPIキー
         const API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak'; 
         let player;
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: '',
-                playerVars: { 
-                    'playsinline': 1, 
-                    'controls': 1, 
-                    'rel': 0,
-                    'origin': location.origin
-                }
+                playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0 },
+                events: { 'onError': onPlayerError }
             });
+        }
+
+        function onPlayerError(e) {
+            const vid = player.getVideoData().video_id;
+            if(vid) {
+                document.getElementById('ext-link').href = `https://www.youtube.com/watch?v=${vid}`;
+                document.getElementById('error-overlay').style.display = 'flex';
+            }
         }
 
         async function doSearch() {
             const q = document.getElementById('search-input').value;
-            const status = document.getElementById('status');
-            const lst = document.getElementById('lst');
             if (!q) return;
-
-            status.innerText = "SEARCHING YOUTUBE MUSIC...";
             
-            // Musicカテゴリ(10)を指定し、クエリにMusicを加えて精度を高める
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q + " Music")}&type=video&videoCategoryId=10&maxResults=25&key=${API_KEY}`;
+            document.getElementById('status').innerText = "SEARCHING MUSIC...";
+            document.getElementById('error-overlay').style.display = 'none';
+
+            // 検索ワードに「Topic」や「Music」を混ぜ、音楽カテゴリ(10)で検索
+            const query = encodeURIComponent(q + " Official Music");
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=video&videoCategoryId=10&maxResults=25&key=${API_KEY}`;
             
             try {
                 const res = await fetch(url);
                 const data = await res.json();
-                
-                if (data.error) {
-                    status.innerHTML = `<span style="color:var(--pink)">ERROR: ${data.error.message}</span>`;
-                    return;
-                }
-
-                status.innerText = `MUSIC LST: ${data.items.length}`;
-                lst.innerHTML = (data.items || []).map(i => `
+                document.getElementById('status').innerText = `MUSIC LST: ${data.items.length}`;
+                document.getElementById('lst').innerHTML = (data.items || []).map(i => `
                     <div class="row" onclick="playVideo('${i.id.videoId}')">
                         <div class="title">${i.snippet.title}</div>
                         <div class="select-btn">選 曲</div>
                     </div>
                 `).join('');
-            } catch (e) {
-                status.innerText = "NETWORK ERROR.";
-            }
+            } catch (e) { document.getElementById('status').innerText = "ERROR."; }
         }
 
         function playVideo(id) {
+            document.getElementById('error-overlay').style.display = 'none';
             if (player && player.loadVideoById) {
                 player.loadVideoById(id);
-                document.getElementById('search-input').blur(); // キーボードを閉じる
+                document.getElementById('search-input').blur();
             }
         }
     </script>
