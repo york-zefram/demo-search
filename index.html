@@ -3,42 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ZEFRAM LST</title>
+    <title>ZEFRAM LST - SEARCH FIRST</title>
     <style>
         :root { --pink: #ff007f; --black: #050505; }
-        body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
+        body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 10px; }
         
-        /* プレイヤー：高さを固定して検索窓を押し出さないようにする */
-        #video-container { width: 100%; height: 210px; background: #000; margin-bottom: 15px; border: 1px solid #333; }
+        /* 検索窓を画面の一番上に固定 */
+        .search-sticky { position: sticky; top: 0; background: var(--black); z-index: 1000; padding-bottom: 10px; border-bottom: 1px solid #333; }
+        #search-input { background: none; border: none; border-bottom: 2px solid var(--pink); font-size: 1.5rem; color: white; width: 100%; padding: 15px 0; outline: none; }
+        #status { font-size: 0.7rem; color: #666; margin-top: 5px; }
+
+        /* プレイヤー：検索窓の下に配置 */
+        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin: 15px 0; border: 1px solid #444; }
         #player { width: 100%; height: 100%; }
 
-        /* 検索窓：常に表示されるように z-index を調整 */
-        .ui-area { position: relative; z-index: 10; }
-        #search-input { background: none; border: none; border-bottom: 2px solid #444; font-size: 1.5rem; color: white; width: 100%; padding: 10px 0; outline: none; margin-bottom: 5px; }
-        #search-input:focus { border-bottom-color: var(--pink); }
-        
-        #status { font-size: 0.7rem; color: #666; margin-bottom: 15px; min-height: 1em; }
-
+        /* リスト表示エリア */
+        #lst { margin-top: 10px; }
         .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; }
         .title { flex-grow: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #eee; }
-        .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 4px 12px; font-size: 0.8rem; border-radius: 2px; flex-shrink: 0; font-weight: bold; letter-spacing: 2px; }
+        .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 6px 15px; font-size: 0.8rem; font-weight: bold; letter-spacing: 2px; }
     </style>
 </head>
 <body>
+
+    <div class="search-sticky">
+        <input type="text" id="search-input" placeholder="SEARCH ARTIST..." onkeydown="if(event.key==='Enter') doSearch()">
+        <div id="status">READY.</div>
+    </div>
 
     <div id="video-container">
         <div id="player"></div>
     </div>
 
-    <div class="ui-area">
-        <input type="text" id="search-input" placeholder="SEARCH..." onkeydown="if(event.key==='Enter') doSearch()">
-        <div id="status">READY.</div>
-        <div id="lst"></div>
-    </div>
+    <div id="lst"></div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        const API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak';
+        const API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak'; //の設定に基づき埋込
         let player;
 
         function onYouTubeIframeAPIReady() {
@@ -52,18 +53,20 @@
             const q = document.getElementById('search-input').value;
             const status = document.getElementById('status');
             const lst = document.getElementById('lst');
-            if (!q) return;
-
-            status.innerText = "CONNECTING...";
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&maxResults=20&key=${API_KEY}`;
             
+            if (!q) return;
+            status.innerText = "CONNECTING TO YOUTUBE...";
+
             try {
+                const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&maxResults=20&key=${API_KEY}`;
                 const res = await fetch(url);
                 const data = await res.json();
+                
                 if (data.error) {
-                    status.innerHTML = `<span style="color:var(--pink)">${data.error.message}</span>`;
+                    status.innerHTML = `<span style="color:var(--pink)">ERROR: ${data.error.message}</span>`;
                     return;
                 }
+
                 status.innerText = `LST COUNT: ${data.items.length}`;
                 lst.innerHTML = (data.items || []).map(i => `
                     <div class="row" onclick="playVideo('${i.id.videoId}')">
@@ -71,7 +74,9 @@
                         <div class="select-btn">選 曲</div>
                     </div>
                 `).join('');
-            } catch (e) { status.innerText = "OFFLINE."; }
+            } catch (e) {
+                status.innerText = "NETWORK ERROR.";
+            }
         }
 
         function playVideo(id) {
