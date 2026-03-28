@@ -6,21 +6,26 @@
     <title>ZEFRAM LST</title>
     <style>
         :root { --pink: #ff007f; --black: #050505; }
-        body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 10px; }
+        body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
+        
+        /* 検索エリアを最上部に固定 */
         .header { position: sticky; top: 0; background: var(--black); z-index: 1000; padding-bottom: 5px; border-bottom: 1px solid #333; }
         #search-input { background: none; border: none; border-bottom: 2px solid var(--pink); font-size: 1.5rem; color: white; width: 100%; padding: 10px 0; outline: none; border-radius: 0; }
-        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin: 10px 0; border: 1px solid #444; position: relative; }
+        
+        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin: 15px 0; border: 1px solid #444; }
         #player { width: 100%; height: 100%; }
+
         .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; }
         .title { flex-grow: 1; font-size: 0.85rem; color: #eee; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }
         .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 5px 15px; font-size: 0.8rem; font-weight: bold; letter-spacing: 2px; flex-shrink: 0; }
+        
         #status { font-size: 0.6rem; color: #666; margin-top: 5px; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <input type="text" id="search-input" placeholder="SEARCH MUSIC..." onkeydown="if(event.key==='Enter') doSearch()">
+        <input type="text" id="search-input" placeholder="SONG SEARCH..." onkeydown="if(event.key==='Enter') doSearch()">
         <div id="status">MUSIC READY.</div>
     </div>
 
@@ -32,13 +37,19 @@
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
+        // 確認済みのAPIキー
         const API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak'; 
         let player;
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: '',
-                playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0 }
+                playerVars: { 
+                    'playsinline': 1, 
+                    'controls': 1, 
+                    'rel': 0,
+                    'origin': location.origin // GitHubドメインを明示
+                }
             });
         }
 
@@ -48,9 +59,9 @@
             
             document.getElementById('status').innerText = "FILTERING PLAYABLE SONGS...";
 
-            // 【ここがポイント】
-            // 埋め込み禁止の "Topic" をあえて除外し、
-            // 「Official MV」「Official Audio」「Dance Practice」を狙い撃ちします。
+            // 【エンジニアの戦略】
+            // videoEmbeddable=true を付けることで、GitHub上で再生可能な動画だけを抽出します
+            // さらに、Official MVやOfficial Audioなど、高画質な音源を狙います
             const musicQuery = encodeURIComponent(q + " (Official MV | Official Audio)");
             const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${musicQuery}&type=video&videoEmbeddable=true&videoCategoryId=10&maxResults=25&key=${API_KEY}`;
             
@@ -58,21 +69,29 @@
                 const res = await fetch(url);
                 const data = await res.json();
                 
-                // 再生可能なものだけをリスト化
+                if (data.error) {
+                    document.getElementById('status').innerText = "API ERROR: " + data.error.message;
+                    return;
+                }
+
                 document.getElementById('lst').innerHTML = (data.items || []).map(i => `
                     <div class="row" onclick="playVideo('${i.id.videoId}')">
                         <div class="title">${i.snippet.title}</div>
                         <div class="select-btn">選 曲</div>
                     </div>
                 `).join('');
-                document.getElementById('status').innerText = `LST: ${data.items.length} (PLAYABLE)`;
-            } catch (e) { document.getElementById('status').innerText = "ERROR."; }
+                document.getElementById('status').innerText = `PLAYABLE SONGS: ${data.items.length}`;
+            } catch (e) { document.getElementById('status').innerText = "OFFLINE."; }
         }
 
         function playVideo(id) {
             if (player && player.loadVideoById) {
-                player.loadVideoById(id);
-                document.getElementById('search-input').blur();
+                // 明確に動画IDを渡して再生開始
+                player.loadVideoById({
+                    videoId: id,
+                    suggestedQuality: 'highres'
+                });
+                document.getElementById('search-input').blur(); // キーボードを閉じる
             }
         }
     </script>
