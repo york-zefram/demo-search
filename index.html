@@ -67,7 +67,8 @@
             document.getElementById('back-btn').style.display = "none";
 
             try {
-                const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q + " Topic")}&maxResults=40&key=${API_KEY}`;
+                // maxResultsを40から50(最大値)に変更
+                const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q + " Topic")}&maxResults=50&key=${API_KEY}`;
                 const res = await fetch(url);
                 const data = await res.json();
                 renderList(data.items);
@@ -95,6 +96,7 @@
         async function loadAlbum(playlistId, title) {
             document.getElementById('status').innerText = "OPENING ALBUM...";
             try {
+                // アルバム内トラックも最大50件取得
                 const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50&key=${API_KEY}`;
                 const res = await fetch(url);
                 const data = await res.json();
