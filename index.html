@@ -6,14 +6,18 @@
     <title>ZEFRAM LST</title>
     <style>
         :root { --pink: #ff007f; --black: #050505; }
-        body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
+        body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 10px; }
         
-        /* 検索エリアを最上部に固定 */
         .header { position: sticky; top: 0; background: var(--black); z-index: 1000; padding-bottom: 5px; border-bottom: 1px solid #333; }
-        #search-input { background: none; border: none; border-bottom: 2px solid var(--pink); font-size: 1.5rem; color: white; width: 100%; padding: 10px 0; outline: none; border-radius: 0; }
+        #search-input { background: none; border: none; border-bottom: 2px solid var(--pink); font-size: 1.5rem; color: white; width: 100%; padding: 10px 0; outline: none; }
         
-        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin: 15px 0; border: 1px solid #444; }
+        /* プレイヤー：エラー時にボタンを重ねるため相対位置に */
+        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin: 10px 0; border: 1px solid #444; position: relative; overflow: hidden; }
         #player { width: 100%; height: 100%; }
+
+        /* エラー時用スイッチボタン */
+        #music-switch { display: none; position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; justify-content: center; align-items: center; }
+        #music-switch a { background: var(--pink); color: white; padding: 12px 24px; text-decoration: none; font-weight: bold; border-radius: 4px; font-size: 0.9rem; }
 
         .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; }
         .title { flex-grow: 1; font-size: 0.85rem; color: #eee; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; }
@@ -25,73 +29,71 @@
 <body>
 
     <div class="header">
-        <input type="text" id="search-input" placeholder="SONG SEARCH..." onkeydown="if(event.key==='Enter') doSearch()">
-        <div id="status">MUSIC READY.</div>
+        <input type="text" id="search-input" placeholder="MUSIC SEARCH..." onkeydown="if(event.key==='Enter') doSearch()">
+        <div id="status">ZEFRAM READY.</div>
     </div>
 
     <div id="video-container">
         <div id="player"></div>
+        <div id="music-switch">
+            <div style="font-size:0.7rem; margin-bottom:10px; color:#aaa;">埋め込み制限があります</div>
+            <a id="ext-link" href="#" target="_blank">YouTube Music で再生</a>
+        </div>
     </div>
 
     <div id="lst"></div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        // 確認済みのAPIキー
         const API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak'; 
         let player;
 
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: '',
-                playerVars: { 
-                    'playsinline': 1, 
-                    'controls': 1, 
-                    'rel': 0,
-                    'origin': location.origin // GitHubドメインを明示
-                }
+                playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0 },
+                events: { 'onError': onPlayerError }
             });
+        }
+
+        // 153エラーや再生拒否を検知
+        function onPlayerError(e) {
+            const vid = player.getVideoData().video_id;
+            if(vid) {
+                // 通常リンクではなくMusic用リンクを生成
+                document.getElementById('ext-link').href = `https://music.youtube.com/watch?v=${vid}`;
+                document.getElementById('music-switch').style.display = 'flex';
+            }
         }
 
         async function doSearch() {
             const q = document.getElementById('search-input').value;
             if (!q) return;
             
-            document.getElementById('status').innerText = "FILTERING PLAYABLE SONGS...";
+            document.getElementById('status').innerText = "SEARCHING MUSIC CONTENT...";
+            document.getElementById('music-switch').style.display = 'none';
 
-            // 【エンジニアの戦略】
-            // videoEmbeddable=true を付けることで、GitHub上で再生可能な動画だけを抽出します
-            // さらに、Official MVやOfficial Audioなど、高画質な音源を狙います
-            const musicQuery = encodeURIComponent(q + " (Official MV | Official Audio)");
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${musicQuery}&type=video&videoEmbeddable=true&videoCategoryId=10&maxResults=25&key=${API_KEY}`;
+            // Music Topic（公式音源）を優先的に取得
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q + " Topic")}&type=video&videoCategoryId=10&maxResults=25&key=${API_KEY}`;
             
             try {
                 const res = await fetch(url);
                 const data = await res.json();
-                
-                if (data.error) {
-                    document.getElementById('status').innerText = "API ERROR: " + data.error.message;
-                    return;
-                }
-
                 document.getElementById('lst').innerHTML = (data.items || []).map(i => `
                     <div class="row" onclick="playVideo('${i.id.videoId}')">
-                        <div class="title">${i.snippet.title}</div>
+                        <div class="title">${i.snippet.title.replace(/ - Topic$/, "")}</div>
                         <div class="select-btn">選 曲</div>
                     </div>
                 `).join('');
-                document.getElementById('status').innerText = `PLAYABLE SONGS: ${data.items.length}`;
-            } catch (e) { document.getElementById('status').innerText = "OFFLINE."; }
+                document.getElementById('status').innerText = `LST: ${data.items.length}`;
+            } catch (e) { document.getElementById('status').innerText = "ERROR."; }
         }
 
         function playVideo(id) {
+            document.getElementById('music-switch').style.display = 'none';
             if (player && player.loadVideoById) {
-                // 明確に動画IDを渡して再生開始
-                player.loadVideoById({
-                    videoId: id,
-                    suggestedQuality: 'highres'
-                });
-                document.getElementById('search-input').blur(); // キーボードを閉じる
+                player.loadVideoById(id);
+                document.getElementById('search-input').blur();
             }
         }
     </script>
