@@ -3,105 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ZEFRAM LST</title>
+    <title>ZEFRAM LST - ALBUM MODE</title>
     <style>
-        :root { --pink: #ff007f; --black: #050505; }
-        body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
+        :root { --pink: #ff007f; --black: #050505; --gray: #222; }
+        body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; overflow-x: hidden; }
         
-        /* 1. プレイヤー固定エリア */
-        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin-bottom: 15px; border: 1px solid #333; position: sticky; top: 0; z-index: 100; }
+        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin-bottom: 15px; border: 1px solid #333; position: sticky; top: 0; z-index: 1000; }
         #player { width: 100%; height: 100%; }
 
-        /* 2. 検索インターフェース */
-        .search-box { position: relative; margin-bottom: 10px; }
+        .header { position: sticky; top: calc(100vw * 9 / 16 + 15px); background: var(--black); z-index: 900; padding-bottom: 5px; }
         #search-input { background: none; border: none; border-bottom: 2px solid #444; font-size: 1.5rem; color: white; width: 100%; padding: 10px 0; outline: none; border-radius: 0; }
         #search-input:focus { border-bottom-color: var(--pink); }
-        #status { font-size: 0.7rem; color: #666; margin-bottom: 15px; height: 1em; }
+        #status { font-size: 0.7rem; color: #666; margin: 10px 0; height: 1.2em; text-transform: uppercase; }
 
-        /* 3. 選曲リスト（Topic強化仕様） */
+        /* セクション分け */
+        .section-label { font-size: 0.7rem; color: var(--pink); font-weight: bold; margin: 20px 0 10px; border-left: 3px solid var(--pink); padding-left: 8px; letter-spacing: 2px; }
+
         .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; -webkit-tap-highlight-color: transparent; }
         .row:active { background: #111; }
-        .title { flex-grow: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #eee; }
-        .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 5px 15px; font-size: 0.8rem; font-weight: bold; border-radius: 2px; flex-shrink: 0; letter-spacing: 2px; }
+        .title { flex-grow: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #eee; }
+        
+        /* アルバムと曲の判別ラベル */
+        .type-tag { font-size: 0.6rem; padding: 2px 5px; background: #333; color: #aaa; margin-right: 10px; border-radius: 2px; flex-shrink: 0; }
+        .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 5px 12px; font-size: 0.75rem; font-weight: bold; border-radius: 2px; flex-shrink: 0; letter-spacing: 1px; }
+        
+        #back-btn { display: none; color: var(--pink); font-size: 0.8rem; margin-bottom: 15px; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="video-container">
-        <div id="player"></div>
-    </div>
+    <div id="video-container"><div id="player"></div></div>
     
-    <div class="search-box">
-        <input type="text" id="search-input" placeholder="SEARCH MUSIC..." onkeydown="if(event.key==='Enter') doSearch()">
-        <div id="status">READY.</div>
+    <div class="header">
+        <input type="text" id="search-input" placeholder="ARTIST OR ALBUM..." onkeydown="if(event.key==='Enter') doSearch()">
+        <div id="status">READY</div>
+        <div id="back-btn" onclick="restoreLastSearch()">← BACK TO SEARCH RESULTS</div>
     </div>
 
     <div id="lst"></div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        // APIキー（保存された情報に基づき入力済み）
         const API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak'; 
+        let player, lastResultsHTML = "";
 
-        let player;
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: '',
-                playerVars: { 
-                    'playsinline': 1, 
-                    'controls': 1, 
-                    'rel': 0,
-                    'origin': location.origin
-                }
+                playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0, 'origin': location.origin }
             });
         }
 
         async function doSearch() {
             const q = document.getElementById('search-input').value;
-            const status = document.getElementById('status');
-            const lst = document.getElementById('lst');
-            
             if (!q) return;
-            status.innerText = "FILTERING TOPIC SONGS...";
-
-            // 【Topic強化ロジック】
-            // クエリに "Topic" を付加し、カテゴリ10(Music)で検索。さらに埋め込み可能なものに限定
-            const query = encodeURIComponent(q + " Topic");
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${query}&type=video&videoCategoryId=10&videoEmbeddable=true&maxResults=30&key=${API_KEY}`;
             
+            document.getElementById('status').innerText = "FETCHING ALBUMS & SONGS...";
+            document.getElementById('back-btn').style.display = "none";
+
             try {
+                // アルバム(Playlist)と楽曲(Video)を同時に検索
+                const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q + " Topic")}&maxResults=30&key=${API_KEY}`;
                 const res = await fetch(url);
                 const data = await res.json();
                 
-                if (data.error) {
-                    status.innerHTML = `<span style="color:var(--pink)">ERROR: ${data.error.message}</span>`;
-                    return;
-                }
+                renderList(data.items);
+                lastResultsHTML = document.getElementById('lst').innerHTML; // 戻る用に保存
+            } catch (e) { document.getElementById('status').innerText = "SEARCH ERROR."; }
+        }
 
-                status.innerText = `MUSIC LST: ${data.items.length}`;
-                
-                // リスト生成（タイトルから不要な "- Topic" を除去してスッキリさせる）
-                lst.innerHTML = (data.items || []).map(i => {
-                    const cleanTitle = i.snippet.title.replace(/\s*-\s*Topic/gi, '');
-                    return `
-                        <div class="row" onclick="playVideo('${i.id.videoId}')">
-                            <div class="title">${cleanTitle}</div>
-                            <div class="select-btn">選 曲</div>
-                        </div>
-                    `;
-                }).join('');
-            } catch (e) {
-                status.innerText = "OFFLINE.";
+        function renderList(items) {
+            const lst = document.getElementById('lst');
+            let html = "";
+
+            // アルバムを先に表示
+            const playlists = items.filter(i => i.id.kind === 'youtube#playlist');
+            if (playlists.length > 0) {
+                html += '<div class="section-label">ALBUMS</div>';
+                html += playlists.map(i => `
+                    <div class="row" onclick="loadAlbum('${i.id.playlistId}', '${i.snippet.title}')">
+                        <span class="type-tag">ALBUM</span>
+                        <div class="title">${i.snippet.title.replace(/ - Topic$/, "")}</div>
+                        <div class="select-btn">OPEN</div>
+                    </div>
+                `).join('');
             }
+
+            // 楽曲を表示
+            const videos = items.filter(i => i.id.kind === 'youtube#video');
+            if (videos.length > 0) {
+                html += '<div class="section-label">SONGS</div>';
+                html += videos.map(i => `
+                    <div class="row" onclick="playVideo('${i.id.videoId}')">
+                        <span class="type-tag">SONG</span>
+                        <div class="title">${i.snippet.title.replace(/ - Topic$/, "")}</div>
+                        <div class="select-btn">選 曲</div>
+                    </div>
+                `).join('');
+            }
+            lst.innerHTML = html;
+        }
+
+        async function loadAlbum(playlistId, title) {
+            document.getElementById('status').innerText = `OPENING ALBUM: ${title}`;
+            try {
+                const url = `https://www.googleapis.com/youtube/v3/playlistItems?part=snippet&playlistId=${playlistId}&maxResults=50&key=${API_KEY}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                
+                let html = `<div class="section-label">${title} - TRACKS</div>`;
+                html += data.items.map(i => `
+                    <div class="row" onclick="playVideo('${i.snippet.resourceId.videoId}')">
+                        <div class="title">${i.snippet.title}</div>
+                        <div class="select-btn">選 曲</div>
+                    </div>
+                `).join('');
+                
+                document.getElementById('lst').innerHTML = html;
+                document.getElementById('back-btn').style.display = "block";
+                window.scrollTo(0, 0);
+            } catch (e) { document.getElementById('status').innerText = "ALBUM LOAD ERROR."; }
+        }
+
+        function restoreLastSearch() {
+            document.getElementById('lst').innerHTML = lastResultsHTML;
+            document.getElementById('back-btn').style.display = "none";
+            document.getElementById('status').innerText = "RESTORED SEARCH RESULTS";
         }
 
         function playVideo(id) {
             if (player && player.loadVideoById) {
-                player.loadVideoById({
-                    videoId: id,
-                    suggestedQuality: 'highres'
-                });
-                document.getElementById('search-input').blur(); // キーボードを閉じる
+                player.loadVideoById({ videoId: id, suggestedQuality: 'highres' });
+                document.getElementById('search-input').blur();
             }
         }
     </script>
