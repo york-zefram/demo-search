@@ -7,96 +7,69 @@
     <style>
         :root { --pink: #ff007f; --black: #050505; }
         body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
-        
         #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin-bottom: 15px; border: 1px solid #333; position: sticky; top: 0; z-index: 100; }
         #player { width: 100%; height: 100%; }
-
         #search-input { background: none; border: none; border-bottom: 2px solid #444; font-size: 1.5rem; color: white; width: 100%; padding: 10px 0; outline: none; margin-bottom: 5px; }
         #search-input:focus { border-bottom-color: var(--pink); }
         #status { font-size: 0.7rem; color: #666; margin-bottom: 15px; }
-
-        .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; text-decoration: none; color: inherit; }
+        .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; }
         .title { flex-grow: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #eee; }
         .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 4px 12px; font-size: 0.8rem; border-radius: 2px; flex-shrink: 0; font-weight: bold; letter-spacing: 2px; }
-        
-        /* エラー時用のヘルプボタン */
-        #error-help { display: none; padding: 10px; background: #222; border-left: 4px solid var(--pink); font-size: 0.8rem; margin-bottom: 15px; }
-        #error-help a { color: var(--pink); font-weight: bold; }
+        /* 制限がある動画用の救済ボタン */
+        #error-notice { display: none; padding: 15px; background: #1a1a1a; border: 1px solid var(--pink); margin-bottom: 15px; text-align: center; }
+        #error-notice a { color: var(--pink); font-weight: bold; text-decoration: none; font-size: 0.9rem; }
     </style>
 </head>
 <body>
-
-    <div id="video-container">
-        <div id="player"></div>
+    <div id="video-container"><div id="player"></div></div>
+    <div id="error-notice">
+        再生制限がかかっています。<br>
+        <a id="external-link" href="#" target="_blank">➔ YouTubeアプリで開いて練習する</a>
     </div>
-
-    <div id="error-help">
-        この動画は埋め込み再生が制限されています。<br>
-        <a id="external-link" href="#" target="_blank">ここをタップしてYouTubeで再生</a>
-    </div>
-    
     <input type="text" id="search-input" placeholder="SEARCH..." onkeydown="if(event.key==='Enter') doSearch()">
     <div id="status">READY.</div>
     <div id="lst"></div>
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        const API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak'; //
-
+        const API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak';
         let player;
+
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
                 height: '100%', width: '100%', videoId: '',
                 playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0 },
-                events: { 'onError': onPlayerError }
+                events: { 'onError': (e) => {
+                    const id = player.getVideoData().video_id;
+                    if(id) {
+                        document.getElementById('external-link').href = `https://www.youtube.com/watch?v=${id}`;
+                        document.getElementById('error-notice').style.display = 'block';
+                    }
+                }}
             });
-        }
-
-        // 再生エラーが起きた時の処理
-        function onPlayerError(event) {
-            const videoId = player.getVideoData().video_id;
-            const help = document.getElementById('error-help');
-            const link = document.getElementById('external-link');
-            
-            // YouTube本体へのリンクを生成して表示
-            link.href = `https://www.youtube.com/watch?v=${videoId}`;
-            help.style.display = 'block';
-            document.getElementById('status').innerText = "埋め込み制限：リンクから再生してください";
         }
 
         async function doSearch() {
             const q = document.getElementById('search-input').value;
-            const status = document.getElementById('status');
-            const lst = document.getElementById('lst');
-            
             if (!q) return;
-            status.innerText = "CONNECTING...";
-            document.getElementById('error-help').style.display = 'none';
-
+            document.getElementById('status').innerText = "CONNECTING...";
+            document.getElementById('error-notice').style.display = 'none';
             try {
                 const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&maxResults=20&key=${API_KEY}`;
                 const res = await fetch(url);
                 const data = await res.json();
-                
-                if (data.error) {
-                    status.innerHTML = `<span style="color:var(--pink)">ERROR: ${data.error.message}</span>`;
-                    return;
-                }
-
-                status.innerText = `LST COUNT: ${data.items.length}`;
-                lst.innerHTML = (data.items || []).map(i => `
+                document.getElementById('status').innerText = `LST COUNT: ${data.items.length}`;
+                document.getElementById('lst').innerHTML = data.items.map(i => `
                     <div class="row" onclick="playVideo('${i.id.videoId}')">
                         <div class="title">${i.snippet.title}</div>
                         <div class="select-btn">選 曲</div>
                     </div>
                 `).join('');
-            } catch (e) {
-                status.innerText = "NETWORK ERROR.";
-            }
+            } catch (e) { document.getElementById('status').innerText = "OFFLINE."; }
         }
 
         function playVideo(id) {
-            document.getElementById('error-help').style.display = 'none';
+            document.getElementById('error-notice').style.display = 'none';
             if (player && player.loadVideoById) {
                 player.loadVideoById(id);
                 document.getElementById('search-input').blur();
