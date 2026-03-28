@@ -1,5 +1,3 @@
-<script> const MY_API_KEY = '<script> const MY_API_KEY = 'AIzaSyDo7AbKjXqTdV2CFkasBXFu__dzjE4Srak'; </script>
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -10,16 +8,16 @@
         :root { --pink: #ff007f; --black: #050505; }
         body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
         
-        /* プレイヤーエリア */
-        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin-bottom: 15px; border: 1px solid #333; }
+        /* 1. プレイヤーを固定 */
+        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin-bottom: 15px; border: 1px solid #333; position: sticky; top: 0; z-index: 100; }
         #player { width: 100%; height: 100%; }
 
-        /* 検索入力 */
+        /* 2. 検索エリア */
         #search-input { background: none; border: none; border-bottom: 2px solid #444; font-size: 1.5rem; color: white; width: 100%; padding: 10px 0; outline: none; margin-bottom: 5px; }
         #search-input:focus { border-bottom-color: var(--pink); }
-        #status { font-size: 0.7rem; color: #666; margin-bottom: 15px; height: 15px; }
+        #status { font-size: 0.7rem; color: #666; margin-bottom: 15px; }
 
-        /* リスト表示 */
+        /* 3. リスト表示（スクロールエリア） */
         .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; }
         .row:active { background: #111; }
         .title { flex-grow: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #eee; }
@@ -38,46 +36,38 @@
 
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
+        // ★ここにあなたのAPIキーを貼り付けてください
+        const API_KEY = '取得したAPIキーをここに貼る';
+
         let player;
 
-        // YouTube Playerの初期化
         function onYouTubeIframeAPIReady() {
             player = new YT.Player('player', {
-                height: '100%',
-                width: '100%',
-                videoId: '',
-                playerVars: {
-                    'playsinline': 1,
-                    'controls': 1,
-                    'rel': 0,
-                    'origin': location.protocol + '//' + location.hostname
-                }
+                height: '100%', width: '100%', videoId: '',
+                playerVars: { 'playsinline': 1, 'controls': 1, 'rel': 0 }
             });
         }
 
-        // 検索処理
         async function doSearch() {
             const q = document.getElementById('search-input').value;
             const status = document.getElementById('status');
             const lst = document.getElementById('lst');
             
-            if (!q || MY_API_KEY.includes('ここに')) {
-                status.innerText = "API KEY IS MISSING.";
+            if (!q || API_KEY.includes('ここに')) {
+                status.innerText = "API KEY MISSING.";
                 return;
             }
 
             status.innerText = "CONNECTING...";
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&maxResults=20&key=${MY_API_KEY}`;
+            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&maxResults=20&key=${API_KEY}`;
             
             try {
                 const res = await fetch(url);
                 const data = await res.json();
-                
                 if (data.error) {
-                    status.innerHTML = `<span style="color:var(--pink)">ERROR: ${data.error.message}</span>`;
+                    status.innerHTML = `<span style="color:var(--pink)">${data.error.message}</span>`;
                     return;
                 }
-
                 status.innerText = `LST COUNT: ${data.items.length}`;
                 lst.innerHTML = (data.items || []).map(i => `
                     <div class="row" onclick="playVideo('${i.id.videoId}')">
@@ -85,118 +75,12 @@
                         <div class="select-btn">選 曲</div>
                     </div>
                 `).join('');
-            } catch (e) {
-                status.innerText = "OFFLINE OR API ERROR.";
-            }
+            } catch (e) { status.innerText = "OFFLINE."; }
         }
 
-        // 再生処理
         function playVideo(id) {
             if (player && player.loadVideoById) {
                 player.loadVideoById(id);
-                // 入力欄のフォーカスを外してキーボードを閉じる
-                document.getElementById('search-input').blur();
-            }
-        }
-    </script>
-</body>
-</html>'; </script>
-
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>ZEFRAM LST</title>
-    <style>
-        :root { --pink: #ff007f; --black: #050505; }
-        body { background: var(--black); color: white; font-family: sans-serif; margin: 0; padding: 15px; }
-        
-        /* プレイヤーエリア */
-        #video-container { width: 100%; aspect-ratio: 16 / 9; background: #000; margin-bottom: 15px; border: 1px solid #333; }
-        #player { width: 100%; height: 100%; }
-
-        /* 検索入力 */
-        #search-input { background: none; border: none; border-bottom: 2px solid #444; font-size: 1.5rem; color: white; width: 100%; padding: 10px 0; outline: none; margin-bottom: 5px; }
-        #search-input:focus { border-bottom-color: var(--pink); }
-        #status { font-size: 0.7rem; color: #666; margin-bottom: 15px; height: 15px; }
-
-        /* リスト表示 */
-        .row { display: flex; align-items: center; padding: 15px 0; border-bottom: 1px solid #111; cursor: pointer; }
-        .row:active { background: #111; }
-        .title { flex-grow: 1; font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #eee; }
-        .select-btn { color: var(--pink); border: 1px solid var(--pink); padding: 4px 12px; font-size: 0.8rem; border-radius: 2px; flex-shrink: 0; font-weight: bold; letter-spacing: 2px; }
-    </style>
-</head>
-<body>
-
-    <div id="video-container">
-        <div id="player"></div>
-    </div>
-    
-    <input type="text" id="search-input" placeholder="SEARCH..." onkeydown="if(event.key==='Enter') doSearch()">
-    <div id="status">READY.</div>
-    <div id="lst"></div>
-
-    <script src="https://www.youtube.com/iframe_api"></script>
-    <script>
-        let player;
-
-        // YouTube Playerの初期化
-        function onYouTubeIframeAPIReady() {
-            player = new YT.Player('player', {
-                height: '100%',
-                width: '100%',
-                videoId: '',
-                playerVars: {
-                    'playsinline': 1,
-                    'controls': 1,
-                    'rel': 0,
-                    'origin': location.protocol + '//' + location.hostname
-                }
-            });
-        }
-
-        // 検索処理
-        async function doSearch() {
-            const q = document.getElementById('search-input').value;
-            const status = document.getElementById('status');
-            const lst = document.getElementById('lst');
-            
-            if (!q || MY_API_KEY.includes('ここに')) {
-                status.innerText = "API KEY IS MISSING.";
-                return;
-            }
-
-            status.innerText = "CONNECTING...";
-            const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(q)}&type=video&videoCategoryId=10&maxResults=20&key=${MY_API_KEY}`;
-            
-            try {
-                const res = await fetch(url);
-                const data = await res.json();
-                
-                if (data.error) {
-                    status.innerHTML = `<span style="color:var(--pink)">ERROR: ${data.error.message}</span>`;
-                    return;
-                }
-
-                status.innerText = `LST COUNT: ${data.items.length}`;
-                lst.innerHTML = (data.items || []).map(i => `
-                    <div class="row" onclick="playVideo('${i.id.videoId}')">
-                        <div class="title">${i.snippet.title}</div>
-                        <div class="select-btn">選 曲</div>
-                    </div>
-                `).join('');
-            } catch (e) {
-                status.innerText = "OFFLINE OR API ERROR.";
-            }
-        }
-
-        // 再生処理
-        function playVideo(id) {
-            if (player && player.loadVideoById) {
-                player.loadVideoById(id);
-                // 入力欄のフォーカスを外してキーボードを閉じる
                 document.getElementById('search-input').blur();
             }
         }
