@@ -27,31 +27,22 @@
         
         .row { display: flex; align-items: center; padding: 12px 0; border-bottom: 1px solid #111; cursor: pointer; }
         
-        /* サムネイル枠：ここを基準に中身を切り抜く */
+        /* サムネイル枠：正方形 */
         .thumb-box { 
             width: 50px; 
             height: 50px; 
             flex-shrink: 0; 
             margin-right: 12px; 
-            overflow: hidden; /* 枠からはみ出た部分（黒帯）を隠す */
+            overflow: hidden; 
             border-radius: 2px; 
             background: #222;
-            display: flex;
-            align-items: center;
-            justify-content: center;
         }
-
-        /* 【解決策】
-           YouTubeサムネイル特有の左右の黒帯をカットするため、
-           画像を横に1.35倍（135%）ほど拡大し、上下左右を中央で固定。
-           これで黒帯だけが枠の外に追い出されます。
-        */
+        /* mqdefaultを使用することで左右の黒帯を排除し、中央を抜く */
         .thumb-box img { 
-            width: 135%; 
+            width: 100%; 
             height: 100%; 
             object-fit: cover; 
             display: block;
-            flex-shrink: 0;
         }
 
         .title { flex-grow: 1; font-size: 0.85rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 10px; color: #eee; }
@@ -109,7 +100,8 @@
             if (playlists.length > 0) {
                 html += '<div class="section-label">ALBUMS</div>';
                 html += playlists.map(i => {
-                    const thumb = i.snippet.thumbnails.default.url;
+                    // mqdefaultに差し替え（左右の黒帯がないワイド画像）
+                    const thumb = i.snippet.thumbnails.medium ? i.snippet.thumbnails.medium.url : i.snippet.thumbnails.default.url;
                     return `<div class="row" onclick="loadAlbum('${i.id.playlistId}', '${i.snippet.title}')">
                         <div class="thumb-box"><img src="${thumb}"></div>
                         <span class="type-tag">ALBUM</span>
@@ -123,7 +115,7 @@
             if (videos.length > 0) {
                 html += '<div class="section-label">SONGS</div>';
                 html += videos.map(i => {
-                    const thumb = i.snippet.thumbnails.default.url;
+                    const thumb = i.snippet.thumbnails.medium ? i.snippet.thumbnails.medium.url : i.snippet.thumbnails.default.url;
                     return `<div class="row" onclick="playVideo('${i.id.videoId}')">
                         <div class="thumb-box"><img src="${thumb}"></div>
                         <span class="type-tag">SONG</span>
@@ -143,7 +135,7 @@
                 const data = await res.json();
                 let html = `<div class="section-label">${title.replace(/ - Topic$/, "")}</div>`;
                 html += data.items.map(i => {
-                    const thumb = i.snippet.thumbnails.default.url;
+                    const thumb = i.snippet.thumbnails.medium ? i.snippet.thumbnails.medium.url : i.snippet.thumbnails.default.url;
                     return `<div class="row" onclick="playVideo('${i.snippet.resourceId.videoId}')">
                         <div class="thumb-box"><img src="${thumb}"></div>
                         <div class="title">${i.snippet.title}</div>
